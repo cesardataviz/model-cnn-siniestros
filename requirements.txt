@@ -1,0 +1,13 @@
+torch
+torchvision
+scikit-learn
+matplotlib
+seaborn
+pandas
+numpy
+pillow
+mlflow
+databricks-sdk
+databricks-feature-engineering
+kagglehub
+scipy

@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Notebooks originales (grandes, con outputs binarios) -- viven fuera del repo Git
+*.ipynb_checkpoints
+
+# Modelos/checkpoints locales
+*.pt
+*.pth
+
+# Node / Next.js
+webapp/node_modules/
+webapp/.next/
+webapp/out/
+webapp/.env
+webapp/.env.local
+
+# OS
+.DS_Store
+Thumbs.db

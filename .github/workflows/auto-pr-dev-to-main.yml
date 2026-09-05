@@ -1,0 +1,114 @@
+name: auto-pr-dev-to-main
+
+on:
+  push:
+    branches: ["dev", "DEV"]
+  workflow_dispatch: {}
+
+# Repo Settings → Actions → Workflow permissions:
+#   - Read and write permissions
+#   - Allow GitHub Actions to create and approve pull requests
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  BASE_BRANCH: main
+  KEYWORD: PR                  # palabra EXACTA requerida en algún commit para abrir el PR
+  MIN_AHEAD: "1"
+  PR_TITLE_PREFIX: "Promote"
+  PR_LABELS: "auto-pr,release"
+  PR_REVIEWERS: ""
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluar condiciones
+        id: ctx
+        uses: actions/github-script@v7
+        with:
+          script: |
+            function escapeRegex(s){return (s||"").replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+            const { owner, repo } = context.repo;
+            const base = process.env.BASE_BRANCH || "main";
+            const head = context.ref.replace("refs/heads/","");
+            const commits = context.payload.commits || [];
+            const msgs = commits.map(c => c.message || "");
+
+            const regex = new RegExp(`\\b${escapeRegex(process.env.KEYWORD || "PR")}\\b`);
+            const hit = msgs.some(m => regex.test(m));
+
+            let aheadBy = -1, reason = "";
+            try {
+              const cmp = await github.rest.repos.compareCommits({ owner, repo, base, head });
+              aheadBy = cmp.data.ahead_by ?? -1;
+            } catch (e) {
+              reason = `compareCommits falló: ${e.message}`;
+            }
+
+            let existingUrl = "";
+            try {
+              const existing = await github.rest.pulls.list({ owner, repo, state: "open", base, head: `${owner}:${head}` });
+              if (existing.data.length > 0) existingUrl = existing.data[0].html_url;
+            } catch (e) { /* noop */ }
+
+            const minAhead = parseInt(process.env.MIN_AHEAD || "1", 10);
+            let open = true;
+            if (head.toLowerCase() === base.toLowerCase()) { open=false; reason="push en rama base"; }
+            else if (!hit) { open=false; reason=`no se encontró la palabra exacta "${process.env.KEYWORD}"`; }
+            else if (reason) { open=false; }
+            else if (aheadBy < minAhead) { open=false; reason=`ahead_by=${aheadBy} < MIN_AHEAD=${minAhead}`; }
+            else if (existingUrl) { open=false; reason=`PR ya existe: ${existingUrl}`; }
+
+            core.setOutput("base", base);
+            core.setOutput("head", head);
+            core.setOutput("ahead_by", String(aheadBy));
+            core.setOutput("reason", reason);
+            core.setOutput("open", String(open));
+
+      - name: Crear PR (si procede)
+        if: steps.ctx.outputs.open == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_PAT || github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const base = "${{ steps.ctx.outputs.base }}";
+            const head = "${{ steps.ctx.outputs.head }}";
+            const ahead = parseInt("${{ steps.ctx.outputs.ahead_by }}", 10);
+
+            const title = `${process.env.PR_TITLE_PREFIX || "Promote"} ${head} -> ${base} (${ahead} commit${ahead===1?"":"s"})`;
+            const body  = [
+              "PR automático generado por GitHub Actions.",
+              `- Base: \`${base}\``,
+              `- Head: \`${head}\``,
+              `- Commits por delante: **${ahead}**`,
+            ].join("\n");
+
+            const pr = await github.rest.pulls.create({ owner, repo, base, head, title, body });
+            core.notice(`PR creado: ${pr.data.html_url}`);
+
+            const labels = (process.env.PR_LABELS || "").split(",").map(s=>s.trim()).filter(Boolean);
+            if (labels.length) {
+              try { await github.rest.issues.addLabels({ owner, repo, issue_number: pr.data.number, labels }); }
+              catch(e){ core.warning(`No se pudieron añadir labels: ${e.message}`); }
+            }
+
+            const reviewers = (process.env.PR_REVIEWERS || "").split(",").map(s=>s.trim()).filter(Boolean);
+            if (reviewers.length) {
+              try { await github.rest.pulls.requestReviewers({ owner, repo, pull_number: pr.data.number, reviewers }); }
+              catch(e){ core.warning(`No se pudieron asignar reviewers: ${e.message}`); }
+            }
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "### Auto PR"
+            echo "- Base: \`${{ steps.ctx.outputs.base }}\`"
+            echo "- Head: \`${{ steps.ctx.outputs.head }}\`"
+            echo "- ahead_by: \`${{ steps.ctx.outputs.ahead_by }}\`"
+            echo "- Abrir PR: \`${{ steps.ctx.outputs.open }}\`"
+            echo "- Motivo (si no abre): \`${{ steps.ctx.outputs.reason || '—' }}\`"
+          } >> $GITHUB_STEP_SUMMARY

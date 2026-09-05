@@ -1,0 +1,168 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f4f5f7;
+  color: #1a1a1a;
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.header h1 {
+  font-size: 1.6rem;
+  margin-bottom: 0.25rem;
+}
+
+.header p {
+  color: #555;
+  margin-top: 0;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-top: 1.5rem;
+}
+
+.dropzone {
+  border: 2px dashed #c9cdd3;
+  border-radius: 10px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.dropzone:hover {
+  border-color: #6366f1;
+}
+
+.preview {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 10px;
+  margin-top: 1rem;
+  display: block;
+}
+
+.model-toggle {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.model-btn {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #d5d8dd;
+  background: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.model-btn.active {
+  border-color: #6366f1;
+  background: #eef0ff;
+  color: #4338ca;
+}
+
+.predict-btn {
+  width: 100%;
+  margin-top: 1.25rem;
+  padding: 0.85rem;
+  border-radius: 8px;
+  border: none;
+  background: #4338ca;
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.predict-btn:disabled {
+  background: #a5a6f6;
+  cursor: not-allowed;
+}
+
+.result {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #eee;
+}
+
+.severity {
+  display: inline-block;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+}
+
+.severity.minor {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.severity.moderate {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.severity.severe {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.prob-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.prob-label {
+  width: 90px;
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.prob-bar-bg {
+  flex: 1;
+  height: 8px;
+  background: #eee;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.prob-bar-fill {
+  height: 100%;
+  background: #6366f1;
+}
+
+.prob-value {
+  width: 48px;
+  text-align: right;
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.error-box {
+  margin-top: 1.25rem;
+  padding: 0.9rem 1rem;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 0.9rem;
+}

@@ -1,0 +1,42 @@
+name: ci-lint
+
+on:
+  pull_request:
+    branches: ["main", "dev"]
+  workflow_dispatch: {}
+
+jobs:
+  lint-and-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias mínimas
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision scikit-learn pillow numpy pandas mlflow --extra-index-url https://download.pytorch.org/whl/cpu
+
+      - name: Verificar que src/car_damage importa sin errores
+        run: |
+          cd src
+          python -c "import car_damage; print('OK:', car_damage.__all__)"
+
+      - name: Verificar sintaxis de los notebooks (formato Databricks source)
+        run: |
+          python -m py_compile notebooks/*.py
+
+      - name: Instalar dependencias de la webapp
+        working-directory: webapp
+        run: npm install --no-audit --no-fund
+
+      - name: Lint webapp
+        working-directory: webapp
+        run: npm run lint --if-present
+
+      - name: Build webapp
+        working-directory: webapp
+        run: npm run build

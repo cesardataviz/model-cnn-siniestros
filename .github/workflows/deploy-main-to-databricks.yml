@@ -1,0 +1,89 @@
+name: deploy-main-to-databricks
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    # Secrets (Settings → Secrets and variables → Actions → Secrets):
+    #   - DATABRICKS_HOST   (https://<workspace>.cloud.databricks.com)
+    #   - DATABRICKS_TOKEN  (PAT con permisos de Workspace)
+    # Variables (opcionales):
+    #   - PROJ    (default: car-damage-mlops)
+    #   - BASE_DIR (default: /Shared/projects)
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      PROJ: ${{ vars.PROJ || 'car-damage-mlops' }}
+      BASE_DIR: ${{ vars.BASE_DIR || '/Shared/projects' }}
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Instalar Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Verificar auth
+        run: |
+          set -e
+          [ -n "$DATABRICKS_HOST" ] || (echo "Falta DATABRICKS_HOST" && exit 1)
+          [ -n "$DATABRICKS_TOKEN" ] || (echo "Falta DATABRICKS_TOKEN" && exit 1)
+          databricks --version
+          databricks current-user me || true
+
+      - name: Resolver ruta destino
+        id: path
+        run: |
+          set -e
+          DEST="$BASE_DIR/$PROJ/prod"
+          echo "dir=$DEST" >> "$GITHUB_OUTPUT"
+          echo "Destino: $DEST"
+
+      - name: Preparar destino (limpiar y crear)
+        run: |
+          set -e
+          databricks workspace delete --recursive "${{ steps.path.outputs.dir }}" || true
+          databricks workspace mkdirs "${{ steps.path.outputs.dir }}"
+
+      - name: Preparar staging (solo notebooks/ y src/, sin dotfiles ni webapp)
+        run: |
+          set -e
+          if ! command -v rsync >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y rsync
+          fi
+          mkdir -p /tmp/ws_src
+          rsync -a ./notebooks/ /tmp/ws_src/notebooks \
+            --exclude='__pycache__'
+          rsync -a ./src/ /tmp/ws_src/src \
+            --exclude='__pycache__'
+
+      - name: Importar a Databricks (prod)
+        run: |
+          set -e
+          databricks workspace import-dir \
+            --overwrite \
+            /tmp/ws_src "${{ steps.path.outputs.dir }}"
+
+      - name: Listar contenido final
+        run: |
+          databricks workspace list "${{ steps.path.outputs.dir }}"
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "### Deploy a Databricks"
+            echo "- Destino: \`${{ steps.path.outputs.dir }}\`"
+            echo "- Proyecto: \`${PROJ}\`"
+          } >> $GITHUB_STEP_SUMMARY
