@@ -9,6 +9,7 @@ internamente, y devuelve {clase, probabilidades, confianza} ya listo para la UI.
 import base64
 import io
 
+import mlflow.pyfunc
 import numpy as np
 import pandas as pd
 import torch
@@ -20,7 +21,7 @@ from .transforms import make_transforms
 CLASS_NAMES = ["minor", "moderate", "severe"]
 
 
-class CarDamagePyfunc:
+class CarDamagePyfunc(mlflow.pyfunc.PythonModel):
     """mlflow.pyfunc.PythonModel. `model_type` es "scratch" o "resnet" -- decide
     qué arquitectura reconstruir y con qué estadísticas de normalización."""
 

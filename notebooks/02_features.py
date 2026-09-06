@@ -13,7 +13,7 @@
 # COMMAND ----------
 
 # MAGIC %pip install databricks-feature-engineering torch torchvision -q
-dbutils.library.restartPython()
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -95,6 +95,10 @@ else:
     fe.write_table(name=TABLE_FEATURES, df=features_df, mode="overwrite")
 
 display(spark.table(TABLE_FEATURES).limit(5))
+
+# COMMAND ----------
+
+print("verificacion")
 
 # COMMAND ----------
 

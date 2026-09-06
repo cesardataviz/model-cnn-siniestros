@@ -27,6 +27,7 @@ experiment = mlflow.get_experiment_by_name(EXPERIMENT_PATH)
 
 # COMMAND ----------
 
+# DBTITLE 1,Cell 4
 def register_best(architecture_param: str, model_name: str) -> tuple[str, int]:
     runs = mlflow.search_runs(
         experiment_ids=[experiment.experiment_id],
