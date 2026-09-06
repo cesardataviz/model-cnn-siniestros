@@ -201,6 +201,10 @@ with mlflow.start_run(run_name="cnn_scratch") as run:
 
 # COMMAND ----------
 
+print("Firma añadida")
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Cierre
 # MAGIC El run queda completo: dataset con versión Delta, curvas por época, métricas de negocio
