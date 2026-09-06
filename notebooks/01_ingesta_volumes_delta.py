@@ -12,7 +12,7 @@
 # COMMAND ----------
 
 # MAGIC %pip install kagglehub -q
-dbutils.library.restartPython()
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -36,9 +36,39 @@ VAL_DIR = os.path.join(path, "data3a", "validation")
 
 # COMMAND ----------
 
-import sys
-sys.path.append(os.path.abspath("../src"))
-from car_damage.data import collect_samples
+import re
+
+def normalize_folder_name(name: str) -> str:
+    """'01-minor', 'Minor', '02_moderate', 'SEVERE' -> 'minor', 'moderate', 'severe'"""
+    name = name.lower().strip()
+    name = re.sub(r"^[\d\-_.\s]+", "", name)
+    return name.strip()
+
+def collect_samples(root_dir: str, class_to_idx: dict) -> list:
+    """Recorre root_dir/<clase>/*.jpg y arma [(ruta_absoluta, indice_de_clase), ...]."""
+    samples = []
+    if not os.path.isdir(root_dir):
+        print(f"[aviso] la carpeta no existe: {root_dir}")
+        return samples
+
+    subfolders = [d for d in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, d))]
+    for folder_name in subfolders:
+        normalized = normalize_folder_name(folder_name)
+        matched_class = next(
+            (cls for cls in class_to_idx if cls in normalized or normalized in cls), None
+        )
+        if matched_class is None:
+            print(f"  [aviso] no pude mapear '{folder_name}' a ninguna clase de "
+                  f"{list(class_to_idx.keys())} -- se ignora")
+            continue
+
+        idx = class_to_idx[matched_class]
+        cls_dir = os.path.join(root_dir, folder_name)
+        for fname in os.listdir(cls_dir):
+            if fname.lower().endswith((".jpg", ".jpeg", ".png")):
+                samples.append((os.path.join(cls_dir, fname), idx))
+
+    return samples
 
 kaggle_train_samples = collect_samples(TRAIN_DIR, CLASS_TO_IDX)
 kaggle_val_samples = collect_samples(VAL_DIR, CLASS_TO_IDX)

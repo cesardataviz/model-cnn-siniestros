@@ -12,7 +12,7 @@
 # COMMAND ----------
 
 # MAGIC %pip install databricks-sdk -U -q
-dbutils.library.restartPython()
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 

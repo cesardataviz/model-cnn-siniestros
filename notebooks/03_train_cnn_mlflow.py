@@ -12,7 +12,7 @@
 # COMMAND ----------
 
 # MAGIC %pip install torch torchvision scikit-learn matplotlib seaborn mlflow -q
-dbutils.library.restartPython()
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -20,6 +20,7 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
+import base64
 import os
 import sys
 
@@ -28,9 +29,11 @@ sys.path.append(os.path.abspath("../src"))
 import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import torch
 import torch.nn as nn
+from mlflow.models import infer_signature
 from sklearn.metrics import classification_report, cohen_kappa_score, confusion_matrix
 from torch.utils.data import DataLoader
 
@@ -78,9 +81,9 @@ test_ds = ListImageDataset(test_samples, eval_tf)
 # Balanceo por sampler (no por weight= en la loss -- aplicar ambos sobre-corregiría)
 sampler = make_weighted_sampler(train_samples, num_classes=len(CLASS_NAMES))
 
-train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, sampler=sampler, num_workers=2)
-val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=2)
-test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=2)
+train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, sampler=sampler, num_workers=0)
+val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
+test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 
 # COMMAND ----------
 
@@ -167,14 +170,30 @@ with mlflow.start_run(run_name="cnn_scratch") as run:
             plt.close(fig)
 
     # --- Modelo servible (pyfunc, recibe base64) ---
+    # Unity Catalog exige signature para registrar un modelo. La construimos aquí mismo,
+    # reusando el `model` ya entrenado en memoria (sin recargar desde disco) para que no
+    # haga falta duplicar el preprocesamiento ni volver a instalar nada.
     torch.save(model.state_dict(), ckpt_path)
     pyfunc_model = CarDamagePyfunc(model_type="scratch", img_size=IMG_SIZE)
+
+    sample_path, _ = test_samples[0]
+    with open(sample_path, "rb") as f:
+        sample_b64 = base64.b64encode(f.read()).decode("utf-8")
+    input_example = pd.DataFrame({"image_base64": [sample_b64]})
+
+    signature_probe = CarDamagePyfunc(model_type="scratch", img_size=IMG_SIZE)
+    signature_probe.model, signature_probe.transform, signature_probe.device = model, eval_tf, device
+    output_example = pd.DataFrame([signature_probe._predict_one(sample_b64)])
+    signature = infer_signature(input_example, output_example)
+
     mlflow.pyfunc.log_model(
         artifact_path="model",
         python_model=pyfunc_model,
         artifacts={"state_dict": ckpt_path},
         pip_requirements=["torch", "torchvision", "pillow", "pandas", "numpy"],
         code_paths=[os.path.abspath("../src/car_damage")],
+        signature=signature,
+        input_example=input_example,
     )
 
     run_id_cnn = run.info.run_id
