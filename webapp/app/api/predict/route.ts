@@ -9,9 +9,18 @@ const ENDPOINT_BY_MODEL: Record<ModelKey, string | undefined> = {
   resnet: process.env.DATABRICKS_ENDPOINT_RESNET,
 };
 
+const MAX_IMAGES_PER_REQUEST = 10;
+
 interface PredictRequestBody {
-  imageBase64: string;
+  images: string[];
   model: ModelKey;
+}
+
+interface DatabricksPrediction {
+  predicted_class: string;
+  confidence: number;
+  probabilities: Record<string, number>;
+  gradcam_overlay_base64: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -32,10 +41,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Body inválido, se espera JSON." }, { status: 400 });
   }
 
-  const { imageBase64, model } = body;
-  if (!imageBase64 || (model !== "scratch" && model !== "resnet")) {
+  const { images, model } = body;
+  if (!Array.isArray(images) || images.length === 0 || (model !== "scratch" && model !== "resnet")) {
     return NextResponse.json(
-      { error: "Se requiere 'imageBase64' y 'model' ('scratch' | 'resnet')." },
+      { error: "Se requiere 'images' (arreglo no vacío) y 'model' ('scratch' | 'resnet')." },
+      { status: 400 }
+    );
+  }
+  if (images.length > MAX_IMAGES_PER_REQUEST) {
+    return NextResponse.json(
+      { error: `Máximo ${MAX_IMAGES_PER_REQUEST} imágenes por lote.` },
       { status: 400 }
     );
   }
@@ -50,14 +65,21 @@ export async function POST(req: NextRequest) {
 
   const invocationUrl = `${host.replace(/\/$/, "")}/serving-endpoints/${endpointName}/invocations`;
 
+  // Una sola llamada al endpoint con todas las imágenes del lote -- el modelo servido
+  // ya procesa un arreglo de dataframe_records, no hace falta invocar una vez por imagen.
+  // Medimos la latencia real de esta llamada para mostrarla en la UI -- nada simulado.
+  const startedAt = Date.now();
   const dbResponse = await fetch(invocationUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ dataframe_records: [{ image_base64: imageBase64 }] }),
+    body: JSON.stringify({
+      dataframe_records: images.map((imageBase64) => ({ image_base64: imageBase64 })),
+    }),
   });
+  const latencyMs = Date.now() - startedAt;
 
   if (!dbResponse.ok) {
     const errorText = await dbResponse.text();
@@ -68,19 +90,24 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await dbResponse.json();
-  const prediction = data.predictions?.[0];
+  const predictions: DatabricksPrediction[] = data.predictions ?? [];
 
-  if (!prediction) {
+  if (predictions.length !== images.length) {
     return NextResponse.json(
-      { error: "Respuesta del endpoint sin predicciones." },
+      { error: "El endpoint devolvió un número de resultados distinto al de imágenes enviadas." },
       { status: 502 }
     );
   }
 
   return NextResponse.json({
     model,
-    predictedClass: prediction.predicted_class,
-    confidence: prediction.confidence,
-    probabilities: prediction.probabilities,
+    endpoint: endpointName,
+    latencyMs,
+    results: predictions.map((p) => ({
+      predictedClass: p.predicted_class,
+      confidence: p.confidence,
+      probabilities: p.probabilities,
+      gradcamOverlayBase64: p.gradcam_overlay_base64,
+    })),
   });
 }
