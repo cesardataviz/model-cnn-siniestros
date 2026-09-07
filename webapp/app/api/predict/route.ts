@@ -67,6 +67,8 @@ export async function POST(req: NextRequest) {
 
   // Una sola llamada al endpoint con todas las imágenes del lote -- el modelo servido
   // ya procesa un arreglo de dataframe_records, no hace falta invocar una vez por imagen.
+  // Medimos la latencia real de esta llamada para mostrarla en la UI -- nada simulado.
+  const startedAt = Date.now();
   const dbResponse = await fetch(invocationUrl, {
     method: "POST",
     headers: {
@@ -77,6 +79,7 @@ export async function POST(req: NextRequest) {
       dataframe_records: images.map((imageBase64) => ({ image_base64: imageBase64 })),
     }),
   });
+  const latencyMs = Date.now() - startedAt;
 
   if (!dbResponse.ok) {
     const errorText = await dbResponse.text();
@@ -98,6 +101,8 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     model,
+    endpoint: endpointName,
+    latencyMs,
     results: predictions.map((p) => ({
       predictedClass: p.predicted_class,
       confidence: p.confidence,
