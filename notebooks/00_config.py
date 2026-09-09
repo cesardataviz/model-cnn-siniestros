@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "5"
+# ///
 # MAGIC %md
 # MAGIC # 00 · Configuración compartida
 # MAGIC
@@ -61,3 +65,7 @@ print(f"IMG_SIZE={IMG_SIZE} EPOCHS_CNN={EPOCHS_CNN} EPOCHS_RESNET_PER_STAGE={EPO
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.{VOLUME_NAME}")
 print("Schema y Volume verificados/creados.")
+
+# COMMAND ----------
+
+print("config_notebook.py cargado")

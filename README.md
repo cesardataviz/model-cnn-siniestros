@@ -85,6 +85,8 @@ uno documenta sus prerrequisitos en su celda de cabecera).
 
 Variables de entorno del proyecto en Vercel (ver `webapp/.env.example`):
 
+Link de la web: https://car-damage-triage.vercel.app/
+
 - `DATABRICKS_HOST`, `DATABRICKS_TOKEN`
 - `DATABRICKS_ENDPOINT_CNN` = `car-damage-cnn-scratch`
 - `DATABRICKS_ENDPOINT_RESNET` = `car-damage-resnet18`
